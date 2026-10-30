@@ -21,6 +21,24 @@ DEFAULT_TZ = os.environ.get("DEFAULT_TZ", "UTC")
 HOST = os.environ.get("TS_HOST") or socket.gethostname()
 
 
+def _where() -> dict:
+    """Where this clock is running. Env-driven; no network lookups.
+
+    TS_LOCATION  free-form place label, e.g. "home-lab"
+    TS_LAT/LON   optional coordinates
+    """
+    w = {"host": HOST}
+    if loc := os.environ.get("TS_LOCATION"):
+        w["location"] = loc
+    lat, lon = os.environ.get("TS_LAT"), os.environ.get("TS_LON")
+    if lat and lon:
+        try:
+            w["coords"] = [float(lat), float(lon)]
+        except ValueError:
+            pass
+    return w
+
+
 @mcp.tool()
 async def get_current_time(tz: str = DEFAULT_TZ) -> str:
     """
@@ -31,7 +49,8 @@ async def get_current_time(tz: str = DEFAULT_TZ) -> str:
                   Examples: "America/New_York", "UTC", "Europe/London"
 
     Returns:
-        str: JSON with unix, iso_utc, local datetime, day_of_week, timezone, host.
+        str: JSON with unix, iso_utc, local datetime, day_of_week, timezone, host,
+             and location/coords when configured.
     """
     try:
         now_local = datetime.now(ZoneInfo(tz))
@@ -44,7 +63,7 @@ async def get_current_time(tz: str = DEFAULT_TZ) -> str:
         "local": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "day_of_week": now_local.strftime("%A"),
         "timezone": tz,
-        "host": HOST,
+        **_where(),
     }, indent=2)
 
 
